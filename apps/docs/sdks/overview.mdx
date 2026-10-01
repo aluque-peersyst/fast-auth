@@ -54,6 +54,7 @@ export interface IFastAuthProvider {
   isLoggedIn(): Promise<boolean>;
   requestTransactionSignature(...args: any[]): Promise<RequestTransactionSignatureResponse>;
   requestDelegateActionSignature(...args: any[]): Promise<RequestDelegateActionSignatureResponse>;
+  requestMessageSignature?(...args: any[]): Promise<RequestMessageSignatureResponse>;
   getSignatureRequest(): Promise<GetSignatureRequestResponse>;
   getPath(): Promise<string>;
 }
