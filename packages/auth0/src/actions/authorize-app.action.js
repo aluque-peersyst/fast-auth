@@ -1,10 +1,15 @@
 const { Transaction } = require("@near-js/transactions");
-const { deserialize } = require("borsh");
+// borsh must be 2.x: 1.x decodes strings byte by byte, which garbles non-ASCII text on the consent screen.
+const { deserialize, serialize } = require("borsh");
 
 // KEYS
 
 const TRANSACTION_KEY = "transaction";
 const DELEGATE_ACTION_KEY = "delegateAction";
+const NEP413_KEY = "nep413";
+
+/** NEP-413 prefix tag: 2^31 + 413. */
+const NEP413_TAG = 2147484061;
 
 /** NEP-366 delegate action prefix: 2^30 + 366. */
 const DELEGATE_ACTION_PREFIX = 1073742190;
@@ -180,12 +185,38 @@ const SCHEMA = new (class BorshSchema {
             signature: this.Signature,
         },
     };
+    SignMessagePayload = {
+        struct: {
+            tag: "u32",
+            message: "string",
+            nonce: { array: { type: "u8", len: 32 } },
+            recipient: "string",
+            callbackUrl: { option: "string" },
+        },
+    };
 })();
 
 // UTILS
 
 function parseTransaction(txString) {
     return Transaction.decode(Uint8Array.from(txString.split(",").map((value) => Number(value))));
+}
+
+function parseSignMessage(encodedMessage) {
+    const values = encodedMessage.split(",").map((value) => Number(value));
+    const payload = deserialize(SCHEMA.SignMessagePayload, Uint8Array.from(values));
+
+    // Re-serializing must give back exactly these values: rejects trailing bytes, non-byte values and malformed UTF-8.
+    const canonical = new Uint8Array(serialize(SCHEMA.SignMessagePayload, payload));
+    if (canonical.length !== values.length || canonical.some((byte, i) => byte !== values[i])) {
+        throw new Error("Message payload is not canonical borsh");
+    }
+
+    if (payload.tag !== NEP413_TAG) {
+        throw new Error("Payload is not a NEP-413 message");
+    }
+
+    return payload;
 }
 
 function decodeDelegateAction(encodedDelegateAction) {
@@ -238,7 +269,8 @@ exports.onExecutePostLogin = async (event, api) => {
     const isOnchainAudience = event.resource_server?.identifier === onchainAudience;
     const hasTxParams = TRANSACTION_KEY in query;
     const hasDelegateParams = DELEGATE_ACTION_KEY in query;
-    const hasSigningPayload = hasTxParams || hasDelegateParams;
+    const hasNep413Params = NEP413_KEY in query;
+    const hasSigningPayload = hasTxParams || hasDelegateParams || hasNep413Params;
 
     if (isOnchainAudience && !hasSigningPayload) {
         return api.access.deny("Signing audience requested without transaction payload");
@@ -274,7 +306,32 @@ exports.onExecutePostLogin = async (event, api) => {
         name: event.client.name,
     };
 
-    if (hasTxParams) {
+    if (hasNep413Params) {
+        let signMessage;
+        try {
+            signMessage = parseSignMessage(query.nep413);
+        } catch (_) {
+            return api.access.deny("Invalid NEP-413 payload");
+        }
+
+        // Without a form ID the message would still be put in the signing token, never shown.
+        if (!event.secrets.NEP413_FORM) {
+            return api.access.deny("NEP-413 consent form is not configured");
+        }
+
+        api.prompt.render(event.secrets.NEP413_FORM, {
+            fields: {
+                ...branding,
+                message: signMessage.message,
+                recipient: signMessage.recipient,
+                callbackUrl: signMessage.callbackUrl ?? "",
+            },
+        });
+        api.accessToken.setCustomClaim(
+            "fatxn",
+            query.nep413.split(",").map((value) => Number(value)),
+        );
+    } else if (hasTxParams) {
         const transaction = parseTransaction(query.transaction);
         api.prompt.render(event.secrets.TRANSACTION_FORM, {
             fields: {
