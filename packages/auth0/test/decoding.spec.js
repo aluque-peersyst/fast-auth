@@ -125,11 +125,7 @@ describe("decodeDelegateAction — happy paths", () => {
 
 describe("decodeDelegateAction — malformed payloads", () => {
     test.each(delegateCases().map((c) => [c.name, c]))("%s", (_name, c) => {
-        if (c.nonThrowing) {
-            expect(() => decodeDelegateAction(c.csv)).not.toThrow();
-        } else {
-            expect(() => decodeDelegateAction(c.csv)).toThrow();
-        }
+        expect(() => decodeDelegateAction(c.csv)).toThrow();
     });
 });
 

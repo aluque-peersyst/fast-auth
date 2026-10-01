@@ -6,6 +6,9 @@ const { deserialize } = require("borsh");
 const TRANSACTION_KEY = "transaction";
 const DELEGATE_ACTION_KEY = "delegateAction";
 
+/** NEP-366 delegate action prefix: 2^30 + 366. */
+const DELEGATE_ACTION_PREFIX = 1073742190;
+
 // SCHEMA definitions
 const SCHEMA = new (class BorshSchema {
     Ed25519Signature = {
@@ -195,6 +198,11 @@ function decodeDelegateAction(encodedDelegateAction) {
     const prefixBytes = encodedDelegateAction.slice(offset, offset + 4);
     const prefix = deserialize(SCHEMA.DelegateActionPrefix, prefixBytes);
     offset += 4;
+
+    // Only the NEP-366 prefix marks a delegate action; anything else, such as a NEP-413 message, is refused.
+    if (prefix.prefix !== DELEGATE_ACTION_PREFIX) {
+        throw new Error("Payload is not a delegate action");
+    }
 
     // Now deserialize the actual DelegateAction from the remaining bytes
     const delegateActionBytes = encodedDelegateAction.slice(offset);
