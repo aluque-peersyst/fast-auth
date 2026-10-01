@@ -90,17 +90,24 @@ function getActionType(action) {
 
 // --- DOM helpers (require document/window — jsdom in tests, real DOM in browser) ---
 
+// Bidi controls reorder displayed text without changing what is signed, so they are shown as U+FFFD.
+const BIDI_CONTROLS = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/g;
+
+function visible(value) {
+    return (value == null ? "" : String(value)).replace(BIDI_CONTROLS, "\uFFFD");
+}
+
 function createTextContent(label, value, link = false) {
     const textContent = document.createElement("div");
     textContent.classList.add("text-content");
 
     const labelElement = document.createElement("div");
     labelElement.classList.add("label");
-    labelElement.textContent = label;
+    labelElement.textContent = visible(label);
 
     const valueElement = document.createElement("div");
     valueElement.classList.add("value");
-    valueElement.textContent = value;
+    valueElement.textContent = visible(value);
 
     if (link) {
         valueElement.classList.add("link");
@@ -508,6 +515,7 @@ var __auth0FormHelpers = {
     decodeFunctionCallArgs: decodeFunctionCallArgs,
     formatPublicKey: formatPublicKey,
     getActionType: getActionType,
+    visible: visible,
     createTextContent: createTextContent,
     createDescription: createDescription,
     createAccordion: createAccordion,
