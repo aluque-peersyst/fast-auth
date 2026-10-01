@@ -10,7 +10,7 @@ import {
     setupGlobalLocationMock,
     mockAuth0Client,
 } from "./mocks";
-import { JavascriptProvider } from "../src";
+import { encodeSignMessage, JavascriptProvider } from "../src";
 import { JavascriptProviderOptions } from "../src/types";
 import { JavascriptProviderError, JavascriptProviderErrorCodes } from "../src/errors";
 
@@ -623,6 +623,97 @@ describe("JavascriptProvider", () => {
                     "Delegate action encoding failed",
                 );
             });
+        });
+    });
+
+    describe("requestMessageSignature", () => {
+        const signMessageParams = {
+            message: "Sign in to Example",
+            recipient: "example.near",
+            nonce: new Uint8Array(32).fill(7),
+            callbackUrl: "https://example.com/cb",
+        };
+        const encodedMessage = encodeSignMessage(signMessageParams);
+
+        describe("with redirect", () => {
+            it("should call loginWithRedirect with the encoded NEP-413 message", async () => {
+                mockAuth0Client.loginWithRedirect.mockResolvedValue(undefined);
+
+                const result = await provider.requestMessageSignature({
+                    ...signMessageParams,
+                    redirectUri: "http://localhost:3000/callback",
+                });
+
+                expect(mockAuth0Client.loginWithRedirect).toHaveBeenCalledWith({
+                    authorizationParams: {
+                        audience: "auth0.jwt.fast-auth.testnet",
+                        scope: "transaction:sign",
+                        redirect_uri: "http://localhost:3000/callback",
+                        nep413: encodedMessage,
+                    },
+                });
+                expect(mockAuth0Client.loginWithPopup).not.toHaveBeenCalled();
+                expect(result).toEqual({ userId: "test-user-id" });
+            });
+        });
+
+        describe("with popup", () => {
+            it("should call loginWithPopup with the encoded NEP-413 message when redirectUri is not provided", async () => {
+                mockAuth0Client.loginWithPopup.mockResolvedValue(undefined);
+
+                const result = await provider.requestMessageSignature(signMessageParams);
+
+                expect(mockAuth0Client.loginWithPopup).toHaveBeenCalledWith({
+                    authorizationParams: {
+                        audience: "auth0.jwt.fast-auth.testnet",
+                        scope: "transaction:sign",
+                        nep413: encodedMessage,
+                    },
+                });
+                expect(mockAuth0Client.loginWithRedirect).not.toHaveBeenCalled();
+                expect(result).toEqual({ userId: "test-user-id" });
+            });
+        });
+
+        it("should encode the NEP-413 payload byte-for-byte as the spec lays it out", () => {
+            const nonce = Uint8Array.from({ length: 32 }, (_, i) => i);
+            const nonceBytes = Array.from(nonce);
+            // u32 tag 2^31 + 413 = 0x8000019d, little-endian.
+            const tag = [0x9d, 0x01, 0x00, 0x80];
+            // borsh string: u32 little-endian byte length, then UTF-8 ("é" is 2 bytes).
+            const message = [3, 0, 0, 0, 0x68, 0xc3, 0xa9];
+            const recipient = [1, 0, 0, 0, 0x61];
+
+            expect(encodeSignMessage({ message: "hé", recipient: "a", nonce })).toEqual([
+                ...tag,
+                ...message,
+                ...nonceBytes,
+                ...recipient,
+                0,
+            ]);
+            expect(encodeSignMessage({ message: "hé", recipient: "a", nonce, callbackUrl: "c" })).toEqual([
+                ...tag,
+                ...message,
+                ...nonceBytes,
+                ...recipient,
+                1,
+                1,
+                0,
+                0,
+                0,
+                0x63,
+            ]);
+        });
+
+        it("should reject a nonce that is not 32 bytes before opening Auth0", async () => {
+            await expect(provider.requestMessageSignature({ ...signMessageParams, nonce: new Uint8Array(31) })).rejects.toThrow(
+                "NEP-413 nonce must be 32 bytes, got 31",
+            );
+            await expect(provider.requestMessageSignature({ ...signMessageParams, nonce: new Uint8Array(33) })).rejects.toThrow(
+                "NEP-413 nonce must be 32 bytes, got 33",
+            );
+            expect(mockAuth0Client.loginWithPopup).not.toHaveBeenCalled();
+            expect(mockAuth0Client.loginWithRedirect).not.toHaveBeenCalled();
         });
     });
 
