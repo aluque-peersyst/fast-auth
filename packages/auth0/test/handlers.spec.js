@@ -146,11 +146,19 @@ describe("onContinuePostLogin — decision gating", () => {
         expect(calls.deny).toEqual([]);
     });
 
-    test("does not deny when no decision/prompt is present", async () => {
+    test("denies when no decision/prompt is present, without calling it a user rejection", async () => {
         const { api, calls } = makeApi();
 
         await onContinuePostLogin({}, api);
 
-        expect(calls.deny).toEqual([]);
+        expect(calls.deny).toEqual(["Signing request was not approved"]);
+    });
+
+    test("denies any decision other than approved", async () => {
+        const { api, calls } = makeApi();
+
+        await onContinuePostLogin({ prompt: { fields: { decision: "Approved" } } }, api);
+
+        expect(calls.deny).toEqual(["Signing request was not approved"]);
     });
 });

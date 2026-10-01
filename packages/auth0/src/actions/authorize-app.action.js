@@ -307,8 +307,7 @@ exports.onExecutePostLogin = async (event, api) => {
 };
 
 /**
- * Handler that will be invoked when this action is resuming after an external redirect. If your
- * onExecutePostLogin function does not perform a redirect, this function can be safely ignored.
+ * Handler invoked when this action resumes after the consent form; it denies unless the form recorded an approval.
  *
  * @param {Event} event - Details about the user and the context in which they are logging in.
  * @param {PostLoginAPI} api - Interface whose methods can be used to change the behavior of the login.
@@ -316,8 +315,13 @@ exports.onExecutePostLogin = async (event, api) => {
 exports.onContinuePostLogin = async (event, api) => {
     // The decision form (see shared/decision) writes the user's choice into the `decision`
     // hidden field, which the runtime surfaces here as event.prompt.fields.decision.
-    if (event.prompt?.fields?.decision === "denied") {
+    // Only an explicit "approved" resumes: the claim is already set by the time the form renders.
+    const decision = event.prompt?.fields?.decision;
+    if (decision === "denied") {
         return api.access.deny("User rejected the signing request");
+    }
+    if (decision !== "approved") {
+        return api.access.deny("Signing request was not approved");
     }
 };
 
