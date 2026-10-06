@@ -27,7 +27,7 @@ function AuthorizeAppMessageDetails(context) {
             // textContent, never innerHTML: the message is attacker-controlled by the requesting app.
             const messageBody = document.createElement("pre");
             messageBody.classList.add("message-body");
-            messageBody.textContent = __auth0FormHelpers.visible(params.message);
+            messageBody.textContent = params.message;
             messageContainer.appendChild(messageBody);
 
             box.appendChild(messageContainer);

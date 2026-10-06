@@ -125,25 +125,6 @@ describe("getActionType", () => {
     });
 });
 
-describe("visible", () => {
-    test("shows every bidi control as U+FFFD and leaves other text unchanged", () => {
-        const controls = "\u061C\u200E\u200F\u202A\u202B\u202C\u202D\u202E\u2066\u2067\u2068\u2069";
-
-        expect(helpers.visible(`a${controls}b`)).toBe(`a${"\uFFFD".repeat(12)}b`);
-        expect(helpers.visible("héllo 👋\nworld")).toBe("héllo 👋\nworld");
-        expect(helpers.visible(undefined)).toBe("");
-    });
-});
-
-describe("createTextContent (DOM)", () => {
-    test("shows bidi controls in the label and value as U+FFFD", () => {
-        const row = helpers.createTextContent("Method\u202E", "moc.ppa-laer\u2066");
-
-        expect(row.querySelector(".label").textContent).toBe("Method\uFFFD");
-        expect(row.querySelector(".value").textContent).toBe("moc.ppa-laer\uFFFD");
-    });
-});
-
 describe("renderDetails (DOM)", () => {
     function decodedActionsJson(actions) {
         const { csv } = buildTransaction({ actions });

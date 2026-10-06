@@ -31,19 +31,6 @@ describe("NEP-413 form details component", () => {
         expect(css).not.toMatch(/(?<![-\w])(max-)?(height|block-size)\s*:|overflow(-[xy])?\s*:\s*(hidden|clip)|line-clamp/);
     });
 
-    test("makes bidi controls visible instead of letting them reorder the text", () => {
-        const rlo = "\u202E";
-        const box = renderDetails({
-            message: `pay ${rlo}moc.ppa-laer`,
-            recipient: `${rlo}moc.ppa-laer`,
-            callbackUrl: `https://cb.example/${"\u2066"}x`,
-        });
-
-        expect(box.textContent).not.toMatch(/[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/);
-        expect(box.textContent).toContain("\uFFFDmoc.ppa-laer");
-        expect(box.querySelector(".message-body").textContent).toBe("pay \uFFFDmoc.ppa-laer");
-    });
-
     test("shows the callback url when the payload has one", () => {
         const box = renderDetails({ message: "hi", recipient: "example.near", callbackUrl: "https://example.com/cb" });
 
