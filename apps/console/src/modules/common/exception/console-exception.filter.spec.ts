@@ -41,6 +41,12 @@ describe("ConsoleExceptionFilter", () => {
         expect(toBody(validatorError)).toEqual({ statusCode: status, code, message: "request/body must have required property 'name'" });
     });
 
+    it("answers the OpenAPI validator's 401 with the UNAUTHENTICATED envelope and default message", () => {
+        const validatorError = Object.assign(new Error("Authorization header required"), { status: 401, errors: [] });
+
+        expect(toBody(validatorError)).toEqual({ statusCode: 401, code: "UNAUTHENTICATED", message: "A valid ID token is required." });
+    });
+
     it("maps Nest HttpExceptions by status", async () => {
         const uuidError = await new ParseUUIDPipe().transform("not-a-uuid", { type: "param" }).catch((error: unknown) => error);
 

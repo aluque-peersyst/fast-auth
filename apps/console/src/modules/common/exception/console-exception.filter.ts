@@ -9,6 +9,7 @@ import { ERROR_CODES } from "./error-codes";
 
 const CODE_BY_STATUS: Partial<Record<number, ConsoleErrorCode>> = {
     400: "VALIDATION_FAILED",
+    401: "UNAUTHENTICATED",
     404: "NOT_FOUND",
     405: "VALIDATION_FAILED",
     406: "VALIDATION_FAILED",
@@ -38,7 +39,11 @@ export class ConsoleExceptionFilter implements ExceptionFilter {
         const status = statusOf(exception);
         const code = status === undefined ? undefined : CODE_BY_STATUS[status];
         if (status !== undefined && code) {
-            const message = exception instanceof Error && exception.message ? exception.message : ERROR_CODES[code].message;
+            // The OpenAPI validator refuses a missing or non-Bearer header before JwtAuthGuard runs; both answer with one message.
+            const message =
+                code !== "UNAUTHENTICATED" && exception instanceof Error && exception.message
+                    ? exception.message
+                    : ERROR_CODES[code].message;
             return { statusCode: status, code, message };
         }
 
